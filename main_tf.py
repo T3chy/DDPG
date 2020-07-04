@@ -15,8 +15,8 @@ if __name__ == '__main__':
         while not done:
             act = agent.choose_action(obs)
             new_state, reward,done,info = env.step(act)
-            agent.remember(obs,act,reward,new_state,int(done))
-            agent.learn()
+            Agent.remember(obs,act,reward,new_state,int(done))
+            Agent.learn()
             score += reward
             obs = new_state
         score_history.append(score)

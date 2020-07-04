@@ -77,21 +77,21 @@ class Actor(object):
 
         self.unnormalized_actor_gradients = tf.gradients(self.mu,self.params,-self.action_gradient)
         self.actor_gradients = list(map(lambda x: tf.div(x,self.batch_size),self.unnormalized_actor_gradients))
-        self.optimize = tf.train.AdamOptimizer(self.lr).apply.gradients(zip(self.actor_gradients, self.params))
+        self.optimize = tf.train.AdamOptimizer(self.lr).apply_gradients(zip(self.actor_gradients, self.params))
     def build_network(self):
         with tf.variable_scope(self.name):
             self.input = tf.compat.v1.placeholder(tf.float32, shape=[None,*self.input_dims],name='inputs')
             self.action_gradient = tf.compat.v1.placeholder(tf.float32, shape=[None, self.n_actions])
-            fl = 1 / np.sqrt(self.fc1_dims)
-            dense1 = tf.layers.dense(self.input, units=self.fc1_dims, kernel_initializer=tf.random.uniform(f1,f1),bias_initializer=random_uniform(-f1,f1))
-            batch1 = tf.layers=batch_normalization(dense1)
+            f1 = 1 / np.sqrt(self.fc1_dims)
+            dense1 = tf.layers.dense(self.input, units=self.fc1_dims, kernel_initializer=tf.random_uniform_initializer(-f1,f1),bias_initializer=tf.random_uniform_initializer(-f1,f1))
+            batch1 = tf.layers.batch_normalization(dense1)
             layer1_activation = tf.nn.relu(batch1)
             f2 = 1 / np.sqrt(self.fc2_dims)
-            dense2 = tf.layers.dense(layer1_activation,units=self.fc2_dims, kernel_initializer=tf.random.uniform(f2,f2),bias_initializer=random_uniform(-f2,f2))
+            dense2 = tf.layers.dense(layer1_activation,units=self.fc2_dims, kernel_initializer=tf.random_uniform_initializer(f2,f2),bias_initializer=tf.random_uniform_initializer(-f2,f2))
             batch2 = tf.layers.batch_normalization(dense2)
             layer2_activation = tf.nn.relu(batch2)
             f3 = 0.003
-            mu = tf.layers.dense(layer2_activation, units = self.n_actions, activation = 'tanh', kernel_initializer=random_uniform(f3,f3),bias_initializer=random_uniform(-f3,f3))
+            mu = tf.layers.dense(layer2_activation, units = self.n_actions, activation = 'tanh', kernel_initializer=tf.random_uniform_initializer(f3,f3),bias_initializer=tf.random_uniform_initializer(-f3,f3))
             self.mu = tf.multiply(mu, self.action_bound)
     def predict(self, inputs):
         return self.sess.run(self.mu, feed_dict={self.input: inputs})
@@ -104,7 +104,7 @@ class Actor(object):
         print(' ... loading checkpoint ...')
         self.saver.restore(self.sess, self.checkpoint_file)
 class Critic(object):
-    def __init__(self, lr, n_actions, name, input_dims, sess, fcl_dims, fc2_dims, action_bound, batch_size=64, chkpt_dir='tmp/ddpg'):
+    def __init__(self, lr, n_actions, name, input_dims, sess, fc1_dims, fc2_dims, action_bound, batch_size=64, chkpt_dir='tmp/ddpg'):
         self.lr = lr
         self.n_actions = n_actions
         self.name = name
@@ -123,20 +123,20 @@ class Critic(object):
     def build_network(self):
         with tf.variable_scope(self.name):
             self.input = tf.placeholder(tf.float32, shape=[None, *self.input_dims], name='inputs')
-            self.actions = tf.placeholder(tf.float32, shape[None, self.n_actions])
+            self.actions = tf.placeholder(tf.float32, shape=[None, self.n_actions])
             self.q_target = tf.placeholder(tf.float32, shape=[None,1], name='targets')
-            fl = 1 / np.sqrt(self.fc1_dims)
-            dense1 = tf.layers.dense(self.input, units=self.fc1_dims, kernel_initializer=random_uniform(f1,f1),bias_initializer=random_uniform(-f1,f1))
-            batch1 = tf.layers=batch_normalization(dense1)
+            f1 = 1 / np.sqrt(self.fc1_dims)
+            dense1 = tf.layers.dense(self.input, units=self.fc1_dims, kernel_initializer=tf.random_uniform_initializer(-f1,f1),bias_initializer=tf.random_uniform_initializer(-f1,f1))
+            batch1 = tf.layers.batch_normalization(dense1)
             layer1_activation = tf.nn.relu(batch1)
             f2 = 1 / np.sqrt(self.fc2_dims)
-            dense2 = tf.layers.dense(layer1_activation,units=self.fc2_dims, kernel_initializer=random_uniform(f2,f2),bias_initializer=random_uniform(-f2,f2))
+            dense2 = tf.layers.dense(layer1_activation,units=self.fc2_dims, kernel_initializer=tf.random_uniform_initializer(f2,f2),bias_initializer=tf.random_uniform_initializer(-f2,f2))
             batch2 = tf.layers.batch_normalization(dense2)
             action_in = tf.layers.dense(self.actions, units=self.fc2_dims,activation = 'relu')
             state_actions = tf.add(batch2,action_in)
             state_actions = tf.nn.relu(state_actions)
             f3 = .003
-            self.q = tf.layers.dense(state_actions, units=1, kernel_initializer=random_uniform(f3,f3),bias_initializer=random_uniform(-f3,f3),kernel_regularizer=tf.keras.regularizers.l2(0.01))
+            self.q = tf.layers.dense(state_actions, units=1, kernel_initializer=tf.random_uniform_initializer(f3,f3),bias_initializer=tf.random_uniform_initializer(-f3,f3),kernel_regularizer=tf.keras.regularizers.l2(0.01))
             self.loss = tf.losses.mean_squared_error(self.q_target,self.q)
         def predict(self,inputs,actions):
             return self.sess.run(self.q,feed_dict={self.input:inputs, self.actions:actions})
@@ -157,13 +157,13 @@ class Agent(object):
         self.memory = ReplayBuffer(max_size, input_dims, n_actions)
         self.sess = tf.Session()
         self.actor = Actor(alpha,n_actions,'Actor',input_dims, self.sess, layer1_size,layer2_size, env.action_space.high)
-        self.critic = Critic(beta,n_actions,'Critic', input_dims, self.sess, layer1_size,layer2_size)
+        self.critic = Critic(beta,n_actions,'Critic', input_dims, self.sess, layer1_size,layer2_size,env.action_space.high)
         self.target_actor = Actor(alpha,n_actions,'TargetActor',input_dims, self.sess, layer1_size,layer2_size, env.action_space.high)
-        self.target_critic = Critic(beta,n_actions,'TargetCritic', input_dims, self.sess, layer1_size,layer2_size)
+        self.target_critic = Critic(beta,n_actions,'TargetCritic', input_dims, self.sess, layer1_size,layer2_size,env.action_space.high)
         self.noise = OUActionNoise(mu=np.zeros(n_actions))
         self.update_critic = [self.target_critic.params[i].assign(tf.multiply(self.critic.params[i], self.tau) + tf.multiply(self.target_critic.params[i],1. - self.tau)) for i in range(len(self.target_critic.params))]
         self.update_actor = [self.target_actor.params[i].assign(tf.multiply(self.actor.params[i], self.tau) + tf.multiply(self.target_actor.params[i],1. - self.tau)) for i in range(len(self.target_actor.params))]
-        self.sess.run(tf.global_variables_initializaer())
+        self.sess.run(tf.initialize_all_variables())
         self.update_network_parameters(first=True)
     def update_network_parameters(self,first=False):
         if first:
@@ -176,7 +176,7 @@ class Agent(object):
             self.target_critic.sess.run(self.update_critic)
             self.target_actor.sess.run(self.update_actor)
     def remember(self,state,action,reward,new_state,done):
-        self.memory.store_transition(self,state,action,reward,new_state,done)
+        self.memory.store_transition(state,action,reward,new_state,done)
     def choose_action(self,state):
         state = state[np.newaxis, :]
         mu = self.actor.predict(state)
