@@ -7,7 +7,9 @@ agent = Agent(alpha=0.000025,beta=0.00025, input_dims=[8],tau=0.001,env=env)
 np.random.seed(0)
 agent.load_models()
 score_history = []
+ep = 0
 while True:
+    ep += 1
     done = False
     score = 0
     obs = env.reset()
@@ -20,8 +22,8 @@ while True:
         score += reward
         obs = new_state
     score_history.append(score)
-    print('episode',i,'score%.2f' % score, '100 game average %.2f' % np.mean(score_history[-100:]))
-    if i % 25 == 0:
+    print('episode',ep,'score%.2f' % score, '100 game average %.2f' % np.mean(score_history[-100:]))
+    if ep % 25 == 0:
         agent.save_models()    
     if len(score_history) >= 25 and np.mean(score_history[-25:]) > 200:
         break
